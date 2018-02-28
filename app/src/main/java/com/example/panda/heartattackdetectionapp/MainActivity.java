@@ -84,20 +84,15 @@ public class MainActivity extends Activity { //AppCompatActivity
         background.setBackgroundColor(Color.BLACK);*/
         init();
         ButtonInit();
-
         // previous code
         //Link the buttons and textViews to respective views
         //txtString = (TextView) findViewById(R.id.txtString);
         //txtStringLength = (TextView) findViewById(R.id.testView1);
        // sensorView0 = (TextView) findViewById(R.id.sensorView0);
-
         graphClick();
         showGraphView();
-
         btAdapter = BluetoothAdapter.getDefaultAdapter();       // get Bluetooth adapter
         checkBTState();
-
-
         allButtonClickLiesner();
     }
 
@@ -171,18 +166,11 @@ public class MainActivity extends Activity { //AppCompatActivity
             public void onClick(View view) {
                 setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
                 setContentView(R.layout.activity_main);
-                //setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
-                /*requestWindowFeature(Window.FEATURE_NO_TITLE);//Hide title
-                this.getWindow().setFlags(WindowManager.LayoutParams.
-                        FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);*/
+
                 init();
                 ButtonInit();
                 allButtonClickLiesner();
-
-
-                    tbStream.setChecked(tbstreamStatus);
-
-
+                tbStream.setChecked(tbstreamStatus);
                 fullView = true;
                 showGraphView();
             }
@@ -274,7 +262,6 @@ public class MainActivity extends Activity { //AppCompatActivity
         GraphView.addView(graphView);
 
     }
-
 
     void ButtonInit(){
         bConnect = (Button)findViewById(R.id.bConnect);
