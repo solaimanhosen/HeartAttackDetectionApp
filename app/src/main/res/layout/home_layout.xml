@@ -199,6 +199,7 @@ android:orientation="vertical">
                     android:src="@drawable/ic_circle_black_24dp" />    -->
 
             <TextView
+                android:id="@+id/HStatus"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:paddingLeft="10dp"
@@ -230,6 +231,7 @@ android:orientation="vertical">
                     android:src="@drawable/ic_circle_black_24dp" />    -->
 
             <TextView
+                android:id="@+id/HR"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:paddingLeft="10dp"

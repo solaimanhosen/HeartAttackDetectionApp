@@ -31,6 +31,8 @@ import com.jjoe64.graphview.GraphViewSeries;
 import com.jjoe64.graphview.LineGraphView;
 import com.jjoe64.graphview.GraphView.LegendAlign;
 
+import org.w3c.dom.Text;
+
 
 public class MainActivity extends Activity { //AppCompatActivity
     TextView txtArduino, txtString, txtStringLength, sensorView0;
@@ -74,6 +76,19 @@ public class MainActivity extends Activity { //AppCompatActivity
     ToggleButton tbScroll;
     ToggleButton tbStream;
 
+    //TExt view
+    TextView HeartRate;
+    TextView HStatus;
+
+    private double[] ecg = new double[600];
+    private int dataCount;
+    private int index;
+    private boolean dataFull;
+    public static final int M = 5;
+    public static final int N = 30;
+    public static final int winSize = 250;
+    public static final float HP_CONSTANT = (float) 1/M;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -82,6 +97,11 @@ public class MainActivity extends Activity { //AppCompatActivity
         // new code
         /*LinearLayout background = (LinearLayout)findViewById(R.id.bg);
         background.setBackgroundColor(Color.BLACK);*/
+        TextViewInit();
+        dataCount = 0;
+        index = 0;
+        dataFull = false;
+
         init();
         ButtonInit();
         // previous code
@@ -166,7 +186,7 @@ public class MainActivity extends Activity { //AppCompatActivity
             public void onClick(View view) {
                 setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
                 setContentView(R.layout.activity_main);
-
+                //TextViewInit();
                 init();
                 ButtonInit();
                 allButtonClickLiesner();
@@ -195,7 +215,33 @@ public class MainActivity extends Activity { //AppCompatActivity
                             String sensor0 = recDataString.substring(1, 5);            //get sensor value from string between indices 1-5
 
                             // new code
+                            //HeartRate.setText(sensor0);
+
+
                             if (isFloatNumber(sensor0)){
+                                //new code
+                                ecg[index] = Double.parseDouble(sensor0);
+                                index = (index+1)%600;
+                                if(dataCount <= 600){
+                                    dataCount++;
+                                }else{
+                                    dataFull = true;
+                                    int QRS[] = detect(ecg);
+                                    int hr = 0;
+                                    for(int kk = 0; kk <QRS.length; kk++){
+                                        if(QRS[kk] == 1)
+                                            hr++;
+                                    }
+                                    HeartRate.setText(hr+" BPM");
+                                    if(hr <= 40 || hr >= 100){
+                                        HStatus.setText("Irregular Heart Beats");
+                                    }else{
+                                        HStatus.setText("Safe & Healthy Heart Beats");
+                                    }
+                                }
+
+
+
                                 Series.appendData(new GraphView.GraphViewData(graph2LastXValue,Double.parseDouble(sensor0)),AutoScrollX);
 
                                 //X-axis control
@@ -235,8 +281,159 @@ public class MainActivity extends Activity { //AppCompatActivity
         };
     }
 
-    // new code
+    private static int[] detect(double[] ecg) {
+        // circular buffer for input ecg signal
+        // we need to keep a history of M + 1 samples for HP filter
+        double[] ecg_circ_buff = new double[M + 1];
+        int ecg_circ_WR_idx = 0;
+        int ecg_circ_RD_idx = 0;
 
+        // circular buffer for input ecg signal
+        // we need to keep a history of N+1 samples for LP filter
+        double[] hp_circ_buff = new double[N+1];
+        int hp_circ_WR_idx = 0;
+        int hp_circ_RD_idx = 0;
+
+        // LP filter outputs a single point for every input point
+        // This goes straight to adaptive filtering for eval
+        double next_eval_pt = 0;
+
+        // output
+        int[] QRS = new int[ecg.length];
+
+        // running sums for HP and LP filters, values shifted in FILO
+        double hp_sum = 0;
+        double lp_sum = 0;
+
+        // parameters for adaptive thresholding
+        double treshold = 0;
+        boolean triggered = false;
+        int trig_time = 0;
+        double win_max = 0;
+        int win_idx = 0;
+
+        for(int i = 0; i < ecg.length; i++){
+            ecg_circ_buff[ecg_circ_WR_idx++] = ecg[i];
+            ecg_circ_WR_idx %= (M+1);
+
+				/* High pass filtering */
+            if(i < M){
+                // first fill buffer with enough points for HP filter
+                hp_sum += ecg_circ_buff[ecg_circ_RD_idx];
+                hp_circ_buff[hp_circ_WR_idx] = 0;
+            }
+            else{
+                hp_sum += ecg_circ_buff[ecg_circ_RD_idx];
+
+                int tmp = ecg_circ_RD_idx - M;
+                if(tmp < 0){
+                    tmp += M + 1;
+                }
+                hp_sum -= ecg_circ_buff[tmp];
+
+                double y1 = 0;
+                double y2 = 0;
+
+                tmp = (ecg_circ_RD_idx - ((M+1)/2));
+                if(tmp < 0){
+                    tmp += M + 1;
+                }
+                y2 = ecg_circ_buff[tmp];
+
+                y1 = HP_CONSTANT * hp_sum;
+
+                hp_circ_buff[hp_circ_WR_idx] = y2 - y1;
+            }
+
+            ecg_circ_RD_idx++;
+            ecg_circ_RD_idx %= (M+1);
+
+            hp_circ_WR_idx++;
+            hp_circ_WR_idx %= (N+1);
+
+				/* Low pass filtering */
+
+            // shift in new sample from high pass filter
+            lp_sum += hp_circ_buff[hp_circ_RD_idx] * hp_circ_buff[hp_circ_RD_idx];
+
+            if(i < N){
+                // first fill buffer with enough points for LP filter
+                next_eval_pt = 0;
+
+            }
+            else{
+                // shift out oldest data point
+                int tmp = hp_circ_RD_idx - N;
+                if(tmp < 0){
+                    tmp += N+1;
+                }
+                lp_sum -= hp_circ_buff[tmp] * hp_circ_buff[tmp];
+
+                next_eval_pt = lp_sum;
+            }
+
+            hp_circ_RD_idx++;
+            hp_circ_RD_idx %= (N+1);
+
+				/* Adapative thresholding beat detection */
+            // set initial threshold
+            if(i < winSize) {
+                if(next_eval_pt > treshold) {
+                    treshold = next_eval_pt;
+                }
+            }
+
+            // check if detection hold off period has passed
+            if(triggered){
+                trig_time++;
+
+                if(trig_time >= 100){
+                    triggered = false;
+                    trig_time = 0;
+                }
+            }
+
+            // find if we have a new max
+            if(next_eval_pt > win_max) win_max = next_eval_pt;
+
+            // find if we are above adaptive threshold
+            if(next_eval_pt > treshold && !triggered) {
+                QRS[i] = 1;
+
+                triggered = true;
+            }
+            else {
+                QRS[i] = 0;
+            }
+
+            // adjust adaptive threshold using max of signal found
+            // in previous window
+            if(++win_idx > winSize){
+                // weighting factor for determining the contribution of
+                // the current peak value to the threshold adjustment
+                double gamma = 0.175;
+
+                // forgetting factor -
+                // rate at which we forget old observations
+                double alpha = 0.01 + (Math.random() * ((0.1 - 0.01)));
+
+                treshold = alpha * gamma * win_max + (1 - alpha) * treshold;
+
+                // reset current window ind
+                win_idx = 0;
+                win_max = -10000000;
+            }
+        }
+
+        return QRS;
+    }
+
+    // new code
+    void TextViewInit(){
+
+        HeartRate = (TextView)findViewById(R.id.HR);
+        HStatus = (TextView)findViewById(R.id.HStatus);
+    }
     void init(){
         //Bluetooth.gethandler(mHandler);
 
@@ -403,6 +600,8 @@ public class MainActivity extends Activity { //AppCompatActivity
             setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
 
             setContentView(R.layout.home_layout);
+
+            TextViewInit();
             init();
             ButtonInit();
             tbStream.setChecked(tbstreamStatus);
