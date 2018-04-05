@@ -1,7 +1,12 @@
 package com.example.panda.heartattackdetectionapp;
 
+import android.Manifest;
+import android.app.PendingIntent;
 import android.content.pm.ActivityInfo;
+import android.content.pm.PackageManager;
 import android.graphics.Color;
+import android.os.Build;
+import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 
@@ -15,6 +20,7 @@ import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothSocket;
 import android.content.Intent;
 import android.os.Handler;
+import android.telephony.SmsManager;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.view.Window;
@@ -80,10 +86,14 @@ public class MainActivity extends Activity { //AppCompatActivity
     TextView HeartRate;
     TextView HStatus;
 
+    private String phoneNo;
+    private String message;
+
     private double[] ecg = new double[600];
     private int dataCount;
     private int index;
     private boolean dataFull;
+    private boolean msgStatus;
     public static final int M = 5;
     public static final int N = 30;
     public static final int winSize = 250;
@@ -101,6 +111,7 @@ public class MainActivity extends Activity { //AppCompatActivity
         dataCount = 0;
         index = 0;
         dataFull = false;
+        msgStatus = false;
 
         init();
         ButtonInit();
@@ -233,10 +244,23 @@ public class MainActivity extends Activity { //AppCompatActivity
                                             hr++;
                                     }
                                     HeartRate.setText(hr+" BPM");
-                                    if(hr <= 40 || hr >= 100){
+                                    if((hr >= 0 && hr <= 5) && !msgStatus){
+                                        HStatus.setText("Heart Beat too Slow");
+                                        msgStatus = true;
+                                        message = "We are about to loose Patient";
+                                        sendSMSMessage();
+                                    }
+                                    else if((hr <= 40 || hr >= 100) && !msgStatus){
                                         HStatus.setText("Irregular Heart Beats");
-                                    }else{
+                                        msgStatus = true;
+                                        message = "Patient's Heart Beats is not Normal";
+                                        sendSMSMessage();
+                                    }
+                                    else if(hr > 40 && hr < 100){
                                         HStatus.setText("Safe & Healthy Heart Beats");
+                                        msgStatus = false;
+                                        message = "Patient's Heart Beats is Normal";
+                                        sendSMSMessage();
                                     }
                                 }
 
@@ -429,6 +453,50 @@ public class MainActivity extends Activity { //AppCompatActivity
     }
 
     // new code
+    protected void sendSMSMessage() {
+        phoneNo = "01745107288";
+        //message = msg;
+
+        if (Build.VERSION.SDK_INT >= 23) {
+            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS)
+                    != PackageManager.PERMISSION_GRANTED) {
+
+                if (ActivityCompat.shouldShowRequestPermissionRationale((Activity) this,
+                        Manifest.permission.SEND_SMS)) {
+                    ActivityCompat.requestPermissions((Activity) this,
+                            new String[]{Manifest.permission.SEND_SMS},
+                            1);
+                } else {
+                    ActivityCompat.requestPermissions((Activity) this,
+                            new String[]{Manifest.permission.SEND_SMS}, 1);
+                }
+                return;
+
+            }
+        }
+
+        SmsManager sms = SmsManager.getDefault();
+        sms.sendTextMessage(phoneNo, null, message, null, null);
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode,
+                                           String permissions[], int[] grantResults) {
+
+        switch (requestCode) {
+            case 1: {
+                if (grantResults.length > 0
+                        && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    sendSMSMessage();
+
+                }
+                return;
+            }
+
+
+        }
+    }
+
     void TextViewInit(){
 
         HeartRate = (TextView)findViewById(R.id.HR);
@@ -454,7 +522,7 @@ public class MainActivity extends Activity { //AppCompatActivity
         //graphView.setLegendAlign(com.jjoe64.graphview.GraphView.LegendAlign.BOTTOM);
         graphView.setLegendAlign(LegendAlign.BOTTOM);
         graphView.setManualYAxis(true);
-        graphView.setManualYAxisBounds(5, -5);
+        graphView.setManualYAxisBounds(5, 0);
         graphView.addSeries(Series); // data
         GraphView.addView(graphView);
 

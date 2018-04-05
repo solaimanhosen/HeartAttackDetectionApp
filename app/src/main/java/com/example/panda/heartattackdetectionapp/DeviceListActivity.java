@@ -1,5 +1,10 @@
 package com.example.panda.heartattackdetectionapp;
 
+import android.Manifest;
+import android.content.pm.PackageManager;
+import android.os.Build;
+import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 
@@ -8,6 +13,7 @@ import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.content.Intent;
+import android.telephony.SmsManager;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.AdapterView.OnItemClickListener;
@@ -19,6 +25,10 @@ import android.widget.Toast;
 import com.example.panda.heartattackdetectionapp.R;
 
 public class DeviceListActivity extends Activity {   //AppCompatActivity
+    private static final int MY_PERMISSIONS_REQUEST_SEND_SMS =0 ;
+    String phoneNo;
+    String message;
+
     private static final String TAG = "DeviceListActivity";
     private static final boolean D = true;
 
@@ -36,6 +46,7 @@ public class DeviceListActivity extends Activity {   //AppCompatActivity
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_device_list);
 
+
         textConnectionStatus = (TextView)findViewById(R.id.connecting);
 
         textConnectionStatus.setTextSize(40);
@@ -46,6 +57,10 @@ public class DeviceListActivity extends Activity {   //AppCompatActivity
         pairedListView.setAdapter(mPairedDevicesArrayAdapter);
         pairedListView.setOnItemClickListener(mDeviceClickListener);
     }
+
+
+
+
     @Override
     public void onResume(){
         super.onResume();
